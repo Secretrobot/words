@@ -1,0 +1,213 @@
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  #app { width: 100%; min-height: 520px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem 0.5rem; font-family: var(--font-sans); position: relative; overflow: hidden; }
+  #progress-bar { width: 90%; max-width: 340px; height: 6px; background: var(--color-border-tertiary); border-radius: 3px; margin-bottom: 1rem; }
+  #progress-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease, background-color 0.4s ease; }
+  #card-wrapper { width: 100%; max-width: 340px; perspective: 800px; position: relative; }
+  .card { width: 100%; min-height: 340px; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem 1.5rem; text-align: center; cursor: grab; user-select: none; position: relative; will-change: transform; }
+  .card:active { cursor: grabbing; }
+  .card-emoji { font-size: 72px; line-height: 1; margin-bottom: 1rem; display: block; }
+  .card-word { font-size: 2.4rem; font-weight: 500; line-height: 1.1; margin-bottom: 0.75rem; }
+  .card-rank { font-size: 0.8rem; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 0.5rem; opacity: 0.7; }
+  .card-comparison { font-size: 1rem; line-height: 1.5; opacity: 0.85; max-width: 240px; }
+  #nav-row { display: flex; align-items: center; gap: 1rem; margin-top: 1.25rem; }
+  .nav-btn { width: 44px; height: 44px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.15); background: rgba(255,255,255,0.5); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s, background 0.2s; }
+  .nav-btn:active { transform: scale(0.9); }
+  #counter { font-size: 0.9rem; font-weight: 500; opacity: 0.7; min-width: 60px; text-align: center; }
+  #swipe-hint { font-size: 0.78rem; opacity: 0.55; margin-top: 0.75rem; letter-spacing: 0.03em; }
+  .mag-ring { position: absolute; width: 120px; height: 120px; border-radius: 50%; border: 8px solid rgba(255,255,255,0.7); top: 50%; left: 50%; transform: translate(-50%,-50%) scale(0); pointer-events: none; z-index: 10; }
+  .mag-handle { position: absolute; width: 8px; height: 50px; background: rgba(255,255,255,0.7); border-radius: 4px; top: calc(50% + 42px); left: calc(50% + 42px); transform-origin: top center; transform: translate(-50%,0) rotate(45deg) scale(0); pointer-events: none; z-index: 10; }
+  @keyframes magnify-in { 0%{transform:translate(-50%,-50%) scale(0) rotate(-30deg);opacity:0} 60%{transform:translate(-50%,-50%) scale(1.1) rotate(5deg);opacity:1} 100%{transform:translate(-50%,-50%) scale(1) rotate(0deg);opacity:1} }
+  @keyframes magnify-handle { 0%{transform:translate(-50%,0) rotate(45deg) scale(0);opacity:0} 100%{transform:translate(-50%,0) rotate(45deg) scale(1);opacity:1} }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 10%{transform:translateX(-12px) rotate(-1deg)} 20%{transform:translateX(14px) rotate(1deg)} 30%{transform:translateX(-10px) rotate(-0.5deg)} 40%{transform:translateX(10px) rotate(0.5deg)} 50%{transform:translateX(-8px)} 60%{transform:translateX(8px)} 70%{transform:translateX(-5px)} 80%{transform:translateX(5px)} 90%{transform:translateX(-3px)} }
+  @keyframes slam { 0%{transform:translateY(-80px) scale(1.15);opacity:0} 70%{transform:translateY(6px) scale(0.97);opacity:1} 85%{transform:translateY(-3px) scale(1.01)} 100%{transform:translateY(0) scale(1)} }
+  @keyframes grow-pulse { 0%{transform:scale(0.5);opacity:0} 60%{transform:scale(1.08)} 100%{transform:scale(1);opacity:1} }
+  @keyframes float { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-6px)} }
+  @keyframes slide-in-right { 0%{transform:translateX(60px);opacity:0} 100%{transform:translateX(0);opacity:1} }
+  @keyframes slide-in-left { 0%{transform:translateX(-60px);opacity:0} 100%{transform:translateX(0);opacity:1} }
+  .anim-slam { animation: slam 0.5s cubic-bezier(0.22,1,0.36,1) forwards; }
+  .anim-shake { animation: shake 0.6s ease forwards; }
+  .anim-grow { animation: grow-pulse 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+  .anim-float .card-emoji { animation: float 2.5s ease-in-out infinite; }
+  .anim-slide-right { animation: slide-in-right 0.35s cubic-bezier(0.22,1,0.36,1) forwards; }
+  .anim-slide-left { animation: slide-in-left 0.35s cubic-bezier(0.22,1,0.36,1) forwards; }
+</style>
+
+<h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);">Size adjective vocabulary carousel — swipe to explore words from infinitesimal to astronomical</h2>
+
+<div id="app">
+  <div id="progress-bar"><div id="progress-fill"></div></div>
+  <div id="card-wrapper">
+    <div class="card" id="card">
+      <span class="mag-ring" id="mag-ring"></span>
+      <span class="mag-handle" id="mag-handle"></span>
+      <span class="card-emoji" id="card-emoji"></span>
+      <div class="card-rank" id="card-rank"></div>
+      <div class="card-word" id="card-word"></div>
+      <div class="card-comparison" id="card-comparison"></div>
+    </div>
+  </div>
+  <div id="nav-row">
+    <button class="nav-btn" id="btn-prev">←</button>
+    <span id="counter"></span>
+    <button class="nav-btn" id="btn-next">→</button>
+  </div>
+  <div id="swipe-hint">← swipe to explore →</div>
+</div>
+
+<script>
+const words = [
+  { word:"Infinitesimal", emoji:"⚛️", rank:"Impossibly tiny", comparison:"Tinier than an atom — scientists use this word for things almost too small to measure.", effect:"magnify" },
+  { word:"Microscopic", emoji:"🦠", rank:"Unimaginably small", comparison:"Smaller than a speck of dust — you'd need a microscope to see it!", effect:"magnify" },
+  { word:"Minuscule", emoji:"🐜", rank:"Extremely small", comparison:"Like a single ant standing next to a football stadium.", effect:"magnify" },
+  { word:"Teeny", emoji:"🌱", rank:"Really tiny", comparison:"Like a tiny seedling just poking out of the soil.", effect:"float" },
+  { word:"Tiny", emoji:"🐞", rank:"Very small", comparison:"Like a ladybird sitting on your fingernail.", effect:"float" },
+  { word:"Little", emoji:"🐭", rank:"Smaller than average", comparison:"About the size of a mouse — small, but you can definitely see it!", effect:"float" },
+  { word:"Small", emoji:"🍎", rank:"Below average", comparison:"Like an apple — easy to hold in one hand.", effect:"slide" },
+  { word:"Petite", emoji:"🌷", rank:"Daintily small", comparison:"Like a tulip — small and neat, but perfectly formed.", effect:"slide" },
+  { word:"Medium", emoji:"🐕", rank:"Just right", comparison:"About the size of a labrador — not too big, not too small.", effect:"slide" },
+  { word:"Large", emoji:"🐘", rank:"Bigger than average", comparison:"About as tall as an African elephant standing next to you.", effect:"grow" },
+  { word:"Massive", emoji:"🚢", rank:"Hugely heavy", comparison:"Like an ocean liner — weighing more than 50,000 elephants!", effect:"slam" },
+  { word:"Enormous", emoji:"🏠", rank:"Very big", comparison:"Like a house — so big it would be hard to move in a single day!", effect:"slam" },
+  { word:"Gigantic", emoji:"🦕", rank:"Jaw-droppingly big", comparison:"Like a brachiosaurus — its neck alone was as tall as a four-storey building.", effect:"slam" },
+  { word:"Humongous", emoji:"🗽", rank:"Landmark-sized", comparison:"Like the Statue of Liberty — so tall you'd have to crane your neck right back.", effect:"slam" },
+  { word:"Immense", emoji:"🌋", rank:"Volcano-sized", comparison:"Like a supervolcano — big enough to change the weather of the whole planet.", effect:"slam" },
+  { word:"Colossal", emoji:"🌍", rank:"Continent-sized", comparison:"Like the continent of Africa — big enough to fit 14 USAs inside!", effect:"slam" },
+  { word:"Gargantuan", emoji:"🪐", rank:"Planet-scaled", comparison:"Like Saturn — so wide that 9 Earths could fit across it side by side.", effect:"slam" },
+  { word:"Titanic", emoji:"☀️", rank:"Star-sized", comparison:"Like our Sun — big enough to swallow over a million Earths!", effect:"slam" },
+  { word:"Astronomical", emoji:"🌌", rank:"Galaxy-sized", comparison:"Like the Milky Way — it would take 100,000 years at the speed of light to cross it.", effect:"slam" },
+];
+
+let current = 0;
+let animating = false;
+let touchStartX = 0;
+let touchStartY = 0;
+
+const card = document.getElementById('card');
+const cardEmoji = document.getElementById('card-emoji');
+const cardWord = document.getElementById('card-word');
+const cardRank = document.getElementById('card-rank');
+const cardComp = document.getElementById('card-comparison');
+const counter = document.getElementById('counter');
+const progressFill = document.getElementById('progress-fill');
+const magRing = document.getElementById('mag-ring');
+const magHandle = document.getElementById('mag-handle');
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function getCardBg(idx) {
+  const t = idx / (words.length - 1);
+  const stops = [
+    [219,234,254],[186,230,253],[209,250,229],[254,249,195],[254,215,170],[254,202,202],[233,213,255],[253,230,138],[254,226,226]
+  ];
+  const si = t * (stops.length - 1);
+  const lo = Math.floor(si), hi = Math.min(Math.ceil(si), stops.length - 1);
+  const frac = si - lo;
+  const r = lerp(stops[lo][0], stops[hi][0], frac);
+  const g = lerp(stops[lo][1], stops[hi][1], frac);
+  const b = lerp(stops[lo][2], stops[hi][2], frac);
+  return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+}
+
+function getTextColor(idx) {
+  const t = idx / (words.length - 1);
+  const darkStops = [
+    [30,58,138],[7,89,133],[6,78,59],[101,42,0],[124,45,18],[127,29,29],[46,16,101],[120,53,15],[127,29,29]
+  ];
+  const si = t * (darkStops.length - 1);
+  const lo = Math.floor(si), hi = Math.min(Math.ceil(si), darkStops.length - 1);
+  const frac = si - lo;
+  const r = lerp(darkStops[lo][0], darkStops[hi][0], frac);
+  const g = lerp(darkStops[lo][1], darkStops[hi][1], frac);
+  const b = lerp(darkStops[lo][2], darkStops[hi][2], frac);
+  return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+}
+
+function triggerEffect(w, direction) {
+  card.className = 'card';
+  magRing.style.animation = 'none';
+  magHandle.style.animation = 'none';
+  magRing.style.transform = 'translate(-50%,-50%) scale(0)';
+  magHandle.style.transform = 'translate(-50%,0) rotate(45deg) scale(0)';
+  void card.offsetWidth;
+
+  if (w.effect === 'slam') {
+    card.classList.add('anim-slam');
+    card.addEventListener('animationend', () => { card.classList.add('anim-shake'); }, { once: true });
+  } else if (w.effect === 'magnify') {
+    card.classList.add('anim-float');
+    setTimeout(() => {
+      magRing.style.animation = 'magnify-in 0.6s cubic-bezier(0.34,1.56,0.64,1) forwards';
+      magHandle.style.animation = 'magnify-handle 0.6s 0.15s cubic-bezier(0.34,1.56,0.64,1) forwards';
+    }, 100);
+  } else if (w.effect === 'grow') {
+    card.classList.add('anim-grow');
+  } else if (w.effect === 'float') {
+    card.classList.add('anim-float');
+  } else {
+    if (direction === 1) card.classList.add('anim-slide-right');
+    else card.classList.add('anim-slide-left');
+  }
+}
+
+function render(direction) {
+  const w = words[current];
+  card.style.background = getCardBg(current);
+  card.style.color = getTextColor(current);
+  cardEmoji.textContent = w.emoji;
+  cardWord.textContent = w.word;
+  cardRank.textContent = w.rank;
+  cardComp.textContent = w.comparison;
+  counter.textContent = `${current + 1} / ${words.length}`;
+  const pct = (current / (words.length - 1)) * 100;
+  progressFill.style.width = pct + '%';
+  progressFill.style.background = getTextColor(current);
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.style.borderColor = getTextColor(current) + '44';
+    b.style.color = getTextColor(current);
+  });
+  triggerEffect(w, direction);
+  animating = false;
+}
+
+function go(dir) {
+  if (animating) return;
+  const next = current + dir;
+  if (next < 0 || next >= words.length) return;
+  animating = true;
+  current = next;
+  render(dir);
+}
+
+document.getElementById('btn-next').addEventListener('click', () => go(1));
+document.getElementById('btn-prev').addEventListener('click', () => go(-1));
+
+card.addEventListener('touchstart', e => {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+}, { passive: true });
+
+card.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
+}, { passive: true });
+
+let mouseStartX = 0;
+let isDragging = false;
+card.addEventListener('mousedown', e => { mouseStartX = e.clientX; isDragging = true; });
+document.addEventListener('mouseup', e => {
+  if (!isDragging) return;
+  isDragging = false;
+  const dx = e.clientX - mouseStartX;
+  if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') go(1);
+  if (e.key === 'ArrowLeft') go(-1);
+});
+
+render(1);
+</script>
